@@ -1,0 +1,52 @@
+pipeline{
+  agent any
+  environment {
+    def git_code = "http://gitlab.ksonkson.top/06-project/h5.git"
+    def git_key = "1ade9024-d5cb-4ade-b39d-05d45b445b39"
+    def ssh_key = "9fe524d3-ce22-4f94-a367-a47e0dce7bcf"
+    def Starttime = sh(script: "date +'%Y-%m-%d-%H-%M'", returnStdout: true).trim()
+    def path_jenkins = "/var/jenkins_home/workspace/h5"
+    }
+  stages{
+    stage("拉取代码"){
+      steps{
+        checkout([$class: 'GitSCM', branches: [[name: "*/master"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], 
+            userRemoteConfigs: [[credentialsId: "${git_key}", url: "${git_code}"]]])
+        }
+    }
+    stage('停止服务与启动服务-1') {
+      steps {
+        script {
+          def remote = [:]
+          remote.name = 'h5-1'
+          remote.host = '10.0.14.162'
+          remote.port = 46717
+          remote.user = 'root'
+          remote.allowAnyHosts = true
+          withCredentials([sshUserPrivateKey(credentialsId: "${ssh_key}", keyFileVariable: 'id_rsa')]) {
+            remote.identityFile = id_rsa
+            sshCommand remote: remote, command: "rm -rf /data/wwwroot/h5"
+            sshPut remote: remote, from: "${path_jenkins}/unpackage/dist/build/h5", into: "/data/wwwroot/", override: true
+          }
+        }
+      }
+    }
+    stage('停止服务与启动服务-2') {
+      steps {
+        script {
+          def remote = [:]
+          remote.name = 'h5-2'
+          remote.host = '10.0.5.5'
+          remote.port = 46717
+          remote.user = 'root'
+          remote.allowAnyHosts = true
+          withCredentials([sshUserPrivateKey(credentialsId: "${ssh_key}", keyFileVariable: 'id_rsa')]) {
+            remote.identityFile = id_rsa
+            sshCommand remote: remote, command: "rm -rf /data/wwwroot/h5"
+            sshPut remote: remote, from: "${path_jenkins}/unpackage/dist/build/h5", into: "/data/wwwroot/", override: true
+          }
+        }
+      }
+    }
+  }
+}
