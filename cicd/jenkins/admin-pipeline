@@ -1,0 +1,44 @@
+pipeline{
+  agent any
+  environment {
+    def git_code = "http://gitlab.ksonkson.top/06-project/admin.git"
+    def git_key = "1ade9024-d5cb-4ade-b39d-05d45b445b39"
+    def ssh_key = "9fe524d3-ce22-4f94-a367-a47e0dce7bcf"
+    def path_jenkins = "/var/jenkins_home/workspace/admin"
+    def Starttime = sh(script: "date +'%Y-%m-%d-%H-%M'", returnStdout: true).trim()
+    }
+  stages{
+    stage("拉取代码"){
+      steps{
+        checkout([$class: 'GitSCM', branches: [[name: "*/master"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], 
+            userRemoteConfigs: [[credentialsId: "${git_key}", url: "${git_code}"]]])
+        }
+    }
+    stage("编译代码"){
+      tools {
+        nodejs 'node16'
+      }
+      steps{
+        sh "npm install && npm run build:prod"
+      }
+    }
+    stage('停止服务与启动服务') {
+      steps {
+        script {
+          def remote = [:]
+          remote.name = 'admin'
+          remote.host = '10.0.15.206'
+          remote.port = 46717
+          remote.user = 'root'
+          remote.allowAnyHosts = true
+          withCredentials([sshUserPrivateKey(credentialsId: "${ssh_key}", keyFileVariable: 'id_rsa')]) {
+            remote.identityFile = id_rsa
+            sshCommand remote: remote, command: "rm -rf /data/wwwroot/admin"
+            sshPut remote: remote, from: "${path_jenkins}/dist", into: "/data/wwwroot", override: true
+            sshCommand remote: remote, command: "cd /data/wwwroot && mv dist admin"
+          }
+        }
+      }
+    }
+  }
+}
