@@ -1,0 +1,75 @@
+pipeline{
+  agent any
+  tools {
+    maven 'maven'
+  }
+  environment {
+    def git_code = "http://gitlab.ksonkson.top/06-project/image.git"
+    def git_configuration = "http://gitlab.ksonkson.top/06-project/prod.git"
+    def git_key = "1ade9024-d5cb-4ade-b39d-05d45b445b39"
+    def ssh_key = "9fe524d3-ce22-4f94-a367-a47e0dce7bcf"
+    def path_jenkins = "/var/jenkins_home/workspace/image"
+    def Starttime = sh(script: "date +'%Y-%m-%d-%H-%M'", returnStdout: true).trim()
+    }
+  stages{
+    stage("拉取代码"){
+      steps{
+        checkout([$class: 'GitSCM', branches: [[name: "*/master"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], 
+            userRemoteConfigs: [[credentialsId: "${git_key}", url: "${git_code}"]]])
+        }
+    }
+    stage("拉取配置"){
+      steps{
+        checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'configuration']], submoduleCfg:[], userRemoteConfigs: [[credentialsId: "${git_key}", url: "${git_configuration}"]]])
+        }
+    }
+    stage("编译代码"){
+      tools {
+        jdk 'java8'
+      }
+      steps{
+        sh "cp -rf configuration/application.yml ${path_jenkins}/eladmin-system/src/main/resources/config/"
+        sh "cp -rf configuration/application-prod.yml ${path_jenkins}/eladmin-system/src/main/resources/config/"
+        sh "mvn clean package -D maven.test.skip=true"
+      }
+    }
+    stage('停止服务与启动服务-1') {
+      steps {
+        script {
+          def remote = [:]
+          remote.name = 'image-1'
+          remote.host = '10.0.135.197'
+          remote.port = 46717
+          remote.user = 'root'
+          remote.allowAnyHosts = true
+          withCredentials([sshUserPrivateKey(credentialsId: "${ssh_key}", keyFileVariable: 'id_rsa')]) {
+            remote.identityFile = id_rsa
+            sshCommand remote: remote, command: "supervisorctl stop app"
+            sshCommand remote: remote, command: "rm -rf /data/jar/eladmin-system-2.6.jar"
+            sshPut remote: remote, from: "${path_jenkins}/eladmin-system/target/eladmin-system-2.6.jar", into: "/data/jar/", override: true
+            sshCommand remote: remote, command: "supervisorctl restart app"
+          }
+        }
+      }
+    }
+    stage('停止服务与启动服务-2') {
+      steps {
+        script {
+          def remote = [:]
+          remote.name = 'image-2'
+          remote.host = '10.0.134.224'
+          remote.port = 46717
+          remote.user = 'root'
+          remote.allowAnyHosts = true
+          withCredentials([sshUserPrivateKey(credentialsId: "${ssh_key}", keyFileVariable: 'id_rsa')]) {
+            remote.identityFile = id_rsa
+            sshCommand remote: remote, command: "supervisorctl stop app"
+            sshCommand remote: remote, command: "rm -rf /data/jar/eladmin-system-2.6.jar"
+            sshPut remote: remote, from: "${path_jenkins}/eladmin-system/target/eladmin-system-2.6.jar", into: "/data/jar/", override: true
+            sshCommand remote: remote, command: "supervisorctl restart app"
+          }
+        }
+      }
+    }
+  }
+}
